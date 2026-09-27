@@ -1,0 +1,83 @@
+# Pairs Trading 统计套利策略配置文件
+# 所有关键参数集中在此，run.py 从这里读取，保证可复现。
+
+seed: 42
+
+data:
+  start: "2010-01-01"
+  end: "2025-01-01"          # 数据区间 2010–2024（15 年日线）
+  cache_dir: "data"
+  ffill_limit: 5             # 缺失值前向填充上限（交易日）
+
+# 候选对（按经济逻辑分组）；最终回测对由样本内协整检验自动选出
+pair_groups:
+  - {name: "KO/PEP",  tickers: ["KO", "PEP"],  rationale: "Global beverage duopoly, near-identical demand drivers"}
+  - {name: "XOM/CVX", tickers: ["XOM", "CVX"], rationale: "Integrated oil majors, same crude price exposure"}
+  - {name: "V/MA",    tickers: ["V", "MA"],    rationale: "Payment network duopoly, same volume drivers"}
+  - {name: "GLD/GDX", tickers: ["GLD", "GDX"], rationale: "Gold bullion vs gold miners equity"}
+  - {name: "USO/XLE", tickers: ["USO", "XLE"], rationale: "Crude oil futures ETF vs energy equities"}
+  - {name: "EWA/EWC", tickers: ["EWA", "EWC"], rationale: "Australia vs Canada, commodity-linked economies"}
+  - {name: "EWJ/EWG", tickers: ["EWJ", "EWG"], rationale: "Japan vs Germany, export-driven economies"}
+
+pair_selection:
+  pvalue_threshold: 0.10     # Engle-Granger p 值阈值（样本内，10% 显著性；5% 下无一对通过，见研究笔记）
+  max_half_life_days: 180    # 半衰期上限，超过则不具可交易性
+  n_final_pairs: 2           # 最终回测对数量（1–3）
+
+beta:
+  method: "rolling_ols"      # rolling_ols | kalman
+  window: 60
+  windows_to_test: [30, 60, 120]
+  kalman_delta: 0.0001
+  kalman_burn_in: 60
+
+zscore:
+  window: 60
+
+signal:
+  entry: 2.0
+  exit: 0.5
+  stop: 3.5
+  time_stop_halflives: 2.0   # 超过 2 个半衰期未回归则强制平仓
+
+backtest:
+  cost_bps: 5                # 佣金（单边，bps）
+  slippage_bps: 5            # 滑点（单边，bps）
+  borrow_bps: 100            # 借券费（年化 bps，按日计提，仅空仓腿）
+  min_avg_dollar_volume: 10000000   # 流动性过滤：20 日均成交额 > $10M
+
+validation:
+  split_date: "2019-01-01"   # 样本内 2010–2018 / 样本外 2019–2024
+  two_stage:
+    select_end: "2015-01-01" # 选队窗 2010–2014，确认窗 2015–2018，OOS 不动
+    fdr_alpha: 0.05          # Benjamini-Hochberg FDR 水平
+    confirm_pvalue: 0.10     # 确认窗 EG p 值上限
+  gate:
+    window: 250              # 滚动协整门控窗口（约 1 年）
+    pvalue: 0.10             # 门控残差 ADF p 值上限
+  portfolio:
+    vol_window: 60           # 逆波动率加权窗口
+  cost_sensitivity:
+    commission_bps: [0, 5, 10, 20]
+    slippage_bps: [0, 5, 10, 20]
+    borrow_bps: [0, 50, 100, 200]
+  bootstrap:
+    n_boot: 2000
+    block: 20
+  diagnostics:
+    gate_windows: [120, 250, 500]      # 门控窗口敏感性
+    gate_pvalues: [0.05, 0.10, 0.20]   # 门控阈值敏感性
+    random_sims: 1000                  # 随机权重/随机信号模拟次数
+    kalman_deltas: [0.00001, 0.0001, 0.001, 0.01]
+  walkforward:
+    train_days: 756          # 约 3 年训练窗
+    test_months: 6           # 每 6 个月滚动一次
+    entry_grid: [1.5, 2.0, 2.5]
+    beta_window: 60
+  sensitivity:
+    entry: [1.5, 2.0, 2.5, 3.0]
+    exit: [0.0, 0.5, 1.0]
+    window: [30, 60, 120]
+
+reports:
+  dir: "reports"

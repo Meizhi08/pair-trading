@@ -1,0 +1,17 @@
+# 数据缓存（首次运行自动从 Yahoo Finance 重新下载，无需入库）
+data/
+
+# 运行日志（每次运行重新生成；研究结果 research_note.md / figures / csv 保留入库）
+reports/run.log
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# 系统与编辑器
+.DS_Store
+.vscode/
+.ipynb_checkpoints/
